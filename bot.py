@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 # APNI DETAILS YAHAN HAIN
 # ==========================================
 YOUR_EMAIL = "usamazulfiqar121@gmail.com"       
-APP_PASSWORD = "yahan_apna_16_letters_password_likhein" # <-- Yahan apna Gmail App Password dalein
+APP_PASSWORD = "imtjltarxccuiwfq" # <-- Yahan apna Gmail App Password dalein
 
 SURNAME = "ALI"
 NAME = "USAMA"
