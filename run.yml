@@ -2,7 +2,7 @@ name: GVC Auto Checker
 
 on:
   schedule:
-    - cron: '*/50 * * * *' # Har 50 minute baad chalega
+    - cron: '*/50 * * * *'
   workflow_dispatch: 
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       - name: Run Bot
         run: python bot.py
 
-      # Screenshots ko save karne ke liye
+      # Ye naya hissa screenshots ko save karega
       - name: Upload Screenshots
         uses: actions/upload-artifact@v4
         with:
@@ -35,7 +35,7 @@ jobs:
             website_view.png
             after_search.png
 
-      # Ye naya hissa bot ki memory ko save karega
+      # Ye bot ki memory (date) ko save karega
       - name: Commit Counter File
         run: |
           git config --local user.email "action@github.com"
