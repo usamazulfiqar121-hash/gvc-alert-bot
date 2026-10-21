@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 # APNI DETAILS YAHAN HAIN
 # ==========================================
 YOUR_EMAIL = "usamazulfiqar121@gmail.com"       
-APP_PASSWORD = "imtjltarxccuiwfq" # <-- Yahan apna Gmail App Password dalein
+APP_PASSWORD = "imtjltarxccuiwfq" 
 
 SURNAME = "ALI"
 NAME = "USAMA"
@@ -58,61 +58,54 @@ def check_slots():
     print(f"Checking for date: {date_str_html} (Day {days_ahead} from today)")
 
     with sync_playwright() as p:
+        # Hum bot ko insaan banane ke liye custom user-agent use kar rahe hain
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080}
+        )
+        page = context.new_page()
         
         try:
             page.goto(URL, timeout=60000)
-            page.wait_for_timeout(6000) 
+            page.wait_for_timeout(8000) # Zyada wait taake security check clear ho jaye
 
-            # SABSE AHEM: Screenshot lein taake hum dekh sakein website kaisi khul rahi hai
+            # Screenshot lein ke website ne kya dikhaya
             page.screenshot(path="website_view.png")
-            print("Screenshot saved as website_view.png")
+            print("Screenshot saved.")
 
-            # 1. Visa Type Select karna
+            # Form fill karne ki koshish karein (agar form aya ho)
             try:
-                page.locator("select").first.select_option(label="Long-Term Type D (Seasonal/Dependent Employment)")
-                page.wait_for_timeout(2000)
-            except:
-                pass 
-
-            # 2. Details fill karna (Aasan tareeqa)
-            try:
-                # Placeholder ya name se dhoondne ki koshish
-                page.get_by_placeholder("E-mail").fill(YOUR_EMAIL)
-            except:
-                print("Email field nahi mili.")
-                
-            try:
-                page.locator("input[type='text']").nth(0).fill(SURNAME)
-                page.locator("input[type='text']").nth(1).fill(NAME)
-                page.locator("input[type='text']").nth(2).fill(PASSPORT) 
-                print("Form details filled.")
+                # Email box
+                page.locator("input[type='email']").fill(YOUR_EMAIL, timeout=5000)
+                page.locator("input[type='tel']").fill(PHONE, timeout=5000)
+                page.locator("input[type='text']").nth(0).fill(SURNAME, timeout=5000)
+                page.locator("input[type='text']").nth(1).fill(NAME, timeout=5000)
+                page.locator("input[type='text']").nth(2).fill(PASSPORT, timeout=5000) 
+                print("✅ Form details filled successfully.")
             except Exception as e:
-                print("Form fill error:", e)
+                print("❌ Form fill error. Website ne form nahi dikhaya (Block ho gaya shayad).")
 
-            # 3. Date dalna aur Enter dabana
+            # Date dalna
             try:
                 date_input = page.locator("input[type='date']").first
                 date_input.fill(date_str_html)
                 date_input.press("Enter") 
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(2000)
             except:
                 print("Date field error.")
 
-            # 4. Search Button dabana 
+            # Search Button
             try:
-                # Text ke bajaye button tag se dhoondna
                 page.locator("button:has-text('Search')").first.click()
                 page.wait_for_timeout(8000) 
             except:
                 print("Search button error.")
 
-            # 5. Search ke baad dobara screenshot lein
+            # Search ke baad screenshot
             page.screenshot(path="after_search.png")
-            print("After search screenshot saved.")
 
-            # 6. Result check karna (Green Box)
+            # Result check karna
             content = page.content().lower()
             
             if "available appointments" in content:
@@ -128,7 +121,6 @@ def check_slots():
         
         browser.close()
 
-    # Counter update karein
     with open(COUNTER_FILE, "w") as f:
         f.write(str(days_ahead + 1))
 
