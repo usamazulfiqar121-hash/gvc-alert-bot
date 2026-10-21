@@ -2,8 +2,8 @@ name: GVC Auto Checker
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Ye har 15 minute baad chalega
-  workflow_dispatch: # Taake aap khud bhi manually chala sakein
+    - cron: '*/50 * * * *' # Har 50 minute baad chalega
+  workflow_dispatch: 
 
 jobs:
   check:
@@ -25,3 +25,12 @@ jobs:
 
       - name: Run Bot
         run: python bot.py
+
+      # Ye naya hissa bot ki memory ko save karega
+      - name: Commit Counter File
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add date_counter.txt
+          git commit -m "Update date counter" || echo "No changes"
+          git push
