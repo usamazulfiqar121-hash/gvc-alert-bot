@@ -1,7 +1,8 @@
-import time
 import smtplib
+import os
 from email.mime.text import MIMEText
 from playwright.sync_api import sync_playwright
+from datetime import datetime, timedelta
 
 # ==========================================
 # APNI DETAILS YAHAN HAIN
@@ -11,24 +12,24 @@ APP_PASSWORD = "imtjltarxccuiwfq" # <-- Yahan apna Gmail App Password dalein
 
 SURNAME = "ALI"
 NAME = "USAMA"
-DOB = "10/04/2000"  # Screenshot mein date month/day format mein lag rahi thi, agar 4 October hai to 04/10/2000 kar lein
 PASSPORT = "FX1838181"
+DOB = "10/04/2000" 
+PHONE = "3044295713" 
+
+START_AFTER_DAYS = 6 # Aaj se 6 din baad ki date se check karna shuru karega
 # ==========================================
 
 URL = "https://pk-gr-services.gvcworld.eu/appointments/add"
+COUNTER_FILE = "date_counter.txt" 
 
-# Categories jo check karni hain (Schengen Short Term nikal diya gaya hai)
-CATEGORIES_TO_CHECK = [
-    "Long-Term Type D (Seasonal/Dependent Employment)",
-    "National visa (Long-term - type D)",
-    "Premium Lounge (optional service at an additional charge)",
-    "Prime Time (optional service at an additional charge)"
-]
-
-def send_email_alert(category_name):
-    print(f"Slot Mila! Email bhej rahe hain for: {category_name}")
-    msg = MIMEText(f"🚨 GVC Alert: Slot khula hai!\n\nCategory: {category_name}\nForan website check karein: {URL}")
-    msg['Subject'] = f'GVC Alert: {category_name}'
+def send_email_alert(date_checked):
+    print(f"SLOT MIL GAYA! Email bhej rahe hain for date: {date_checked}")
+    # Date ko acha format dena (e.g. 28-10-2026)
+    date_obj = datetime.strptime(date_checked, "%Y-%m-%d")
+    display_date = date_obj.strftime("%d-%m-%Y")
+    
+    msg = MIMEText(f"🚨 GVC Alert: Slot khula hai!\n\nDate: {display_date}\nForan website check karein: {URL}")
+    msg['Subject'] = f'GVC Alert: Slot on {display_date}'
     msg['From'] = YOUR_EMAIL
     msg['To'] = YOUR_EMAIL
 
@@ -41,64 +42,82 @@ def send_email_alert(category_name):
         print("Email send nahi hui:", e)
 
 def check_slots():
+    days_ahead = START_AFTER_DAYS
+    if os.path.exists(COUNTER_FILE):
+        with open(COUNTER_FILE, "r") as f:
+            days_ahead = int(f.read().strip())
+    
+    if days_ahead >= 60:
+        days_ahead = START_AFTER_DAYS
+
+    check_date = datetime.now() + timedelta(days=days_ahead)
+    date_str_html = check_date.strftime("%Y-%m-%d") 
+    
+    print(f"Checking for date: {date_str_html}")
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        print("Website open ho rahi hai...")
         
         try:
             page.goto(URL, timeout=60000)
-            page.wait_for_timeout(5000) # 5 second wait
+            page.wait_for_timeout(6000) # Page load hone ka wait
 
-            for category in CATEGORIES_TO_CHECK:
-                print(f"Checking category: {category}...")
+            # 1. Visa Type Select karna
+            try:
+                page.locator("select").first.select_option(label="Long-Term Type D (Seasonal/Dependent Employment)")
+                page.wait_for_timeout(2000)
+            except:
+                pass # Agar default selected hai to koi masla nahi
+
+            # 2. Details fill karna
+            try:
+                page.locator("input[type='email']").fill(YOUR_EMAIL)
+                page.locator("input[type='tel']").fill(PHONE)
                 
-                try:
-                    # 1. Category select karein (Dropdown)
-                    page.select_option("select", label=category)
-                    page.wait_for_timeout(2000)
+                text_inputs = page.locator("input[type='text']")
+                if text_inputs.count() >= 3:
+                    text_inputs.nth(0).fill(SURNAME)
+                    text_inputs.nth(1).fill(NAME)
+                    text_inputs.nth(2).fill(PASSPORT) 
+                print("Form details filled.")
+            except Exception as e:
+                print("Form fill error:", e)
 
-                    # 2. Details bharein (Selectors may vary, using placeholder/text logic)
-                    # Surname, Name, DOB, Passport fill karne ki koshish
-                    inputs = page.query_selector_all("input")
-                    text_inputs = [i for i in inputs if i.get_attribute("type") == "text" or i.get_attribute("type") == "date"]
-                    
-                    # Note: Website ke design ke mutabiq in fields ko fill karna thoda tricky hai, 
-                    # hum basic fill kar rahe hain
-                    if len(text_inputs) >= 3:
-                        text_inputs[0].fill(SURNAME)
-                        text_inputs[1].fill(NAME)
-                        # Date field alag hoti hai, skip for now
-                        text_inputs[-1].fill(PASSPORT)
+            # 3. Date dalna
+            try:
+                date_input = page.locator("input[type='date']").first
+                date_input.fill(date_str_html)
+                page.wait_for_timeout(1000)
+            except:
+                print("Date field error.")
 
-                    page.wait_for_timeout(1000)
+            # 4. Search Button dabana
+            try:
+                page.locator("text=Search").first.click()
+                page.wait_for_timeout(6000) # Result load hone ka wait
+            except:
+                print("Search button error.")
 
-                    # 3. Search Button dabayein
-                    search_btn = page.locator("text=Search").first
-                    if search_btn:
-                        search_btn.click()
-                        page.wait_for_timeout(5000) # Result ka wait
-                    
-                    # 4. Result check karein
-                    content = page.content().lower()
-                    
-                    if "cannot book an appointment" in content or "please choose another date" in content:
-                        print(f"Nahi hai slot yahan: {category}")
-                    elif "available appointments" in content or "please select time slot" in content:
-                        print(f"🚨 SLOT MIL GAYA: {category}")
-                        send_email_alert(category)
-                        break # Slot mil gaya to loop rok dein
-                    else:
-                        print(f"Website ka response samajh nahi aya: {category}")
+            # 5. Result check karna (Green Box)
+            content = page.content().lower()
+            
+            if "available appointments" in content:
+                print(f"✅ SLOT AVAILABLE: {date_str_html}")
+                send_email_alert(date_str_html)
+            elif "cannot book an appointment" in content or "please choose another date" in content:
+                print(f"❌ Nahi hai slot yahan: {date_str_html}")
+            else:
+                print(f"⚠️ Page load hua lekin status samajh nahi aya.")
 
-                except Exception as e:
-                    print(f"Error in category {category}: {e}")
-                    continue # Agli category try karein
-                
         except Exception as e:
-            print("Main Page Error:", e)
+            print("Main Error:", e)
         
         browser.close()
+
+    # Counter update karein taake agle 15 min baad agli date check ho
+    with open(COUNTER_FILE, "w") as f:
+        f.write(str(days_ahead + 1))
 
 if __name__ == "__main__":
     check_slots()
