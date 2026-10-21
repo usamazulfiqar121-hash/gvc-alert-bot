@@ -15,8 +15,8 @@ NAME = "USAMA"
 PASSPORT = "FX1838181"
 PHONE = "3044295713" 
 
-START_AFTER_DAYS = 6  # Aaj se 6 din baad se check karna shuru karega
-TOTAL_DAYS_TO_CHECK = 60 # Sirf 60 din tak check karega
+START_AFTER_DAYS = 6  
+TOTAL_DAYS_TO_CHECK = 60 
 # ==========================================
 
 URL = "https://pk-gr-services.gvcworld.eu/appointments/add"
@@ -65,6 +65,10 @@ def check_slots():
             page.goto(URL, timeout=60000)
             page.wait_for_timeout(6000) 
 
+            # SABSE AHEM: Screenshot lein taake hum dekh sakein website kaisi khul rahi hai
+            page.screenshot(path="website_view.png")
+            print("Screenshot saved as website_view.png")
+
             # 1. Visa Type Select karna
             try:
                 page.locator("select").first.select_option(label="Long-Term Type D (Seasonal/Dependent Employment)")
@@ -72,16 +76,17 @@ def check_slots():
             except:
                 pass 
 
-            # 2. Details fill karna
+            # 2. Details fill karna (Aasan tareeqa)
             try:
-                page.locator("input[type='email']").fill(YOUR_EMAIL)
-                page.locator("input[type='tel']").fill(PHONE)
+                # Placeholder ya name se dhoondne ki koshish
+                page.get_by_placeholder("E-mail").fill(YOUR_EMAIL)
+            except:
+                print("Email field nahi mili.")
                 
-                text_inputs = page.locator("input[type='text']")
-                if text_inputs.count() >= 3:
-                    text_inputs.nth(0).fill(SURNAME)
-                    text_inputs.nth(1).fill(NAME)
-                    text_inputs.nth(2).fill(PASSPORT) 
+            try:
+                page.locator("input[type='text']").nth(0).fill(SURNAME)
+                page.locator("input[type='text']").nth(1).fill(NAME)
+                page.locator("input[type='text']").nth(2).fill(PASSPORT) 
                 print("Form details filled.")
             except Exception as e:
                 print("Form fill error:", e)
@@ -90,19 +95,24 @@ def check_slots():
             try:
                 date_input = page.locator("input[type='date']").first
                 date_input.fill(date_str_html)
-                date_input.press("Enter") # Website ko date register karne ke liye Enter zaroori hai
+                date_input.press("Enter") 
                 page.wait_for_timeout(1000)
             except:
                 print("Date field error.")
 
-            # 4. Search Button dabana (Wait barha kar 8 second kar diya hai)
+            # 4. Search Button dabana 
             try:
-                page.locator("text=Search").first.click()
+                # Text ke bajaye button tag se dhoondna
+                page.locator("button:has-text('Search')").first.click()
                 page.wait_for_timeout(8000) 
             except:
                 print("Search button error.")
 
-            # 5. Result check karna (Green Box)
+            # 5. Search ke baad dobara screenshot lein
+            page.screenshot(path="after_search.png")
+            print("After search screenshot saved.")
+
+            # 6. Result check karna (Green Box)
             content = page.content().lower()
             
             if "available appointments" in content:
