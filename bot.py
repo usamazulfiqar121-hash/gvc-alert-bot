@@ -13,10 +13,10 @@ APP_PASSWORD = "imtjltarxccuiwfq" # <-- Yahan apna Gmail App Password dalein
 SURNAME = "ALI"
 NAME = "USAMA"
 PASSPORT = "FX1838181"
-DOB = "10/04/2000" 
 PHONE = "3044295713" 
 
-START_AFTER_DAYS = 6 # Aaj se 6 din baad ki date se check karna shuru karega
+START_AFTER_DAYS = 6  # Aaj se 6 din baad se check karna shuru karega
+TOTAL_DAYS_TO_CHECK = 60 # Sirf 60 din tak check karega
 # ==========================================
 
 URL = "https://pk-gr-services.gvcworld.eu/appointments/add"
@@ -24,7 +24,6 @@ COUNTER_FILE = "date_counter.txt"
 
 def send_email_alert(date_checked):
     print(f"SLOT MIL GAYA! Email bhej rahe hain for date: {date_checked}")
-    # Date ko acha format dena (e.g. 28-10-2026)
     date_obj = datetime.strptime(date_checked, "%Y-%m-%d")
     display_date = date_obj.strftime("%d-%m-%Y")
     
@@ -44,16 +43,19 @@ def send_email_alert(date_checked):
 def check_slots():
     days_ahead = START_AFTER_DAYS
     if os.path.exists(COUNTER_FILE):
-        with open(COUNTER_FILE, "r") as f:
-            days_ahead = int(f.read().strip())
+        try:
+            with open(COUNTER_FILE, "r") as f:
+                days_ahead = int(f.read().strip())
+        except:
+            days_ahead = START_AFTER_DAYS
     
-    if days_ahead >= 60:
+    if days_ahead >= (START_AFTER_DAYS + TOTAL_DAYS_TO_CHECK):
         days_ahead = START_AFTER_DAYS
 
     check_date = datetime.now() + timedelta(days=days_ahead)
     date_str_html = check_date.strftime("%Y-%m-%d") 
     
-    print(f"Checking for date: {date_str_html}")
+    print(f"Checking for date: {date_str_html} (Day {days_ahead} from today)")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -61,14 +63,14 @@ def check_slots():
         
         try:
             page.goto(URL, timeout=60000)
-            page.wait_for_timeout(6000) # Page load hone ka wait
+            page.wait_for_timeout(6000) 
 
             # 1. Visa Type Select karna
             try:
                 page.locator("select").first.select_option(label="Long-Term Type D (Seasonal/Dependent Employment)")
                 page.wait_for_timeout(2000)
             except:
-                pass # Agar default selected hai to koi masla nahi
+                pass 
 
             # 2. Details fill karna
             try:
@@ -84,18 +86,19 @@ def check_slots():
             except Exception as e:
                 print("Form fill error:", e)
 
-            # 3. Date dalna
+            # 3. Date dalna aur Enter dabana
             try:
                 date_input = page.locator("input[type='date']").first
                 date_input.fill(date_str_html)
+                date_input.press("Enter") # Website ko date register karne ke liye Enter zaroori hai
                 page.wait_for_timeout(1000)
             except:
                 print("Date field error.")
 
-            # 4. Search Button dabana
+            # 4. Search Button dabana (Wait barha kar 8 second kar diya hai)
             try:
                 page.locator("text=Search").first.click()
-                page.wait_for_timeout(6000) # Result load hone ka wait
+                page.wait_for_timeout(8000) 
             except:
                 print("Search button error.")
 
@@ -115,7 +118,7 @@ def check_slots():
         
         browser.close()
 
-    # Counter update karein taake agle 15 min baad agli date check ho
+    # Counter update karein
     with open(COUNTER_FILE, "w") as f:
         f.write(str(days_ahead + 1))
 
