@@ -1,8 +1,45 @@
-# Screenshots ko save karne ke liye
-- name: Upload Screenshots
-  uses: actions/upload-artifact@v4
-  with:
-    name: bot-screenshots
-    path: |
-      website_view.png
-      after_search.png
+name: GVC Auto Checker
+
+on:
+  schedule:
+    - cron: '*/50 * * * *' # Har 50 minute baad chalega
+  workflow_dispatch: 
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright requests
+          playwright install chromium
+
+      - name: Run Bot
+        run: python bot.py
+
+      # Screenshots ko save karne ke liye
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-screenshots
+          path: |
+            website_view.png
+            after_search.png
+
+      # Ye naya hissa bot ki memory ko save karega
+      - name: Commit Counter File
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add date_counter.txt
+          git commit -m "Update date counter" || echo "No changes"
+          git push
